@@ -8,7 +8,8 @@ from datetime import datetime
 from glob import glob
 from io import StringIO
 import streamlit as st
-from tools import FindDrug , FindSimilarDrugs,PlotSmiles
+from tools import FindDrug , FindSimilarDrugs
+from tools import tools 
 import py3Dmol
 
 from db import db
@@ -202,18 +203,18 @@ find_drug_tool=Tool(
         func=FindDrug ,
         description="Find the  details for the given drug ",
     )
-plot_smiles=Tool(
-    name="Plot2dSmiles",
-    func=PlotSmiles,
-    description="PLot the smiles from the given drug related smiles "
-)
+# plot_smiles=Tool(
+#     name="Plot2dSmiles",
+#     func=pl,
+#     description="PLot the smiles from the given drug related smiles "
+# )
 plot_3d_smile=Tool(
     name="Plot3dSmiles",
     func=plot_3d,
     description="Plot the 3d smiles from the given drug related smiles"
 )   
 agent=initialize_agent(
-        tools=[find_drug_tool,plot_smiles,plot_3d_smile,find_smilar_drug],
+        tools=tools,
         llm=llm,
         agent="zero-shot-react-description",
         verbose=True
