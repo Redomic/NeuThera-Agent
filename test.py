@@ -1,3 +1,3 @@
-from tools import FindDrug
+from tools import Text2AQL, FindDrug
 
-print(FindDrug('random'))
+print(Text2AQL('Find me drug Goserelin'))

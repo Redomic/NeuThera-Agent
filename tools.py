@@ -39,14 +39,11 @@ import boto3
 # )
 
 # llm = Bedrock(client=bedrock_client, model_id="mistral.mistral-large-2402-v1:0")
+
 # ================= Tooling =================
 
-# get_drug
-# drug_to_protein
-# disease_to_drug
-
-def FindDrug(name: str):
-    print("Finding Drug: ", name)
+def FindDrug(drug_name: str):
+    print("Finding Drug: ", )
 
     query = """
     FOR d IN drug
@@ -71,38 +68,39 @@ def FindDrug(name: str):
     results = list(cursor)
     
     return results[0] if results else None
+def FindSimilarDrugs(drug_name, top_k=5):
+    """
+    Finds the top k most similar drugs to the given drug_name based on cosine similarity.
+    
+    Args:
+        drug_name (str): The name of the drug to compare.
+        top_k (int): Number of similar drugs to return.
 
-# def Text2AQL(query: str):
-    chain = ArangoGraphQAChain.from_llm(
-        llm=llm,
-        graph=arango_graph,
-        verbose=True,
-        allow_dangerous_requests=True,
-    )
+    Returns:
+        List of tuples [(drug_name, similarity_score), ...]
+    """
+    # Fetch the target drug's embedding
+    query = f"""
+        FOR doc IN drug
+            FILTER doc.name == @drug_name
+            RETURN doc.embedding
+    """
+    result = list(db.aql.execute(query, bind_vars={"drug_name": drug_name}))
+    
+    if not result:
+        raise ValueError(f"Drug '{drug_name}' not found in the database.")
+    
+    embedding = result[0]
 
-    chain.execute_aql_query = False 
+    aql_query = f"""
+        LET query_vector = @query_vector
+        FOR doc IN drug
+            LET score = COSINE_SIMILARITY(doc.embedding, query_vector)
+            SORT score DESC
+            LIMIT @top_k
+            RETURN {{ drug: doc.name, similarity_score: score }}
+    """
 
-    max_attempts = 3
-    attempts = 0
-    aql = ""
-
-    while attempts < max_attempts:
-        result = chain.invoke(query)
-        aql = result["result"]
-        print("Generated AQL:", aql)
-
-        try:
-            aql_result = list(db.aql.execute(aql))
-        except Exception as e:
-            attempts += 1
-            query += f"\nError in generated AQL:\n```{aql}```\nError: {e}"
-            print(f"Attempt {attempts} failed. Retrying...")
-            continue
-
-        if aql_result:
-            return {"result": aql_result, "script": aql}
-
-        attempts += 1
-        query += f"\nQuery generated empty results. Adjusting...\n```{aql}```"
-
-    return {"result": None, "script": ""}
+    cursor = db.aql.execute(aql_query, bind_vars={"query_vector": embedding, "top_k": top_k})
+    
+    return list(cursor)
