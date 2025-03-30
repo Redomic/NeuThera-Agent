@@ -1,3 +1,3 @@
-from tools import FindSimilarDrugs
+from tools import FindProteinsFromDrug
 
-print(FindSimilarDrugs("goserelin"))
+print(FindProteinsFromDrug("goserelin"))
