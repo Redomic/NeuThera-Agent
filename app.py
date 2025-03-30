@@ -8,7 +8,7 @@ from datetime import datetime
 from glob import glob
 from io import StringIO
 import streamlit as st
-from tools import FindDrug
+from tools import FindDrug , FindSimilarDrugs,PlotSmiles
 import py3Dmol
 
 from db import db
@@ -116,25 +116,26 @@ def plot_3d(smiles):
         smiles (str): SMILES representation of the molecule.
     
     Returns:
-        plotly.graph_objects.Figure or None: 3D visualization of the molecular structure.
+        boolean for if plotted or not 
     """
     # Convert SMILES to molecule
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
-        raise ValueError("Invalid SMILES structure!")
+        return False
 
-    mol = Chem.AddHs(mol)  # Add hydrogen atoms
+    mol = Chem.AddHs(mol)
+    Chem.SanitizeMol(mol)  # Add hydrogen atoms
 
     # Try to generate 3D coordinates
-    status = AllChem.EmbedMolecule(mol, maxAttempts=100) 
+    status = AllChem.EmbedMolecule(mol, AllChem.ETKDG())
     if status == -1:  # If embedding fails
-        raise ValueError("Failed to generate 3D coordinates for this molecule.")
+        return False
 
     # Optimize the molecule
     try:
         AllChem.UFFOptimizeMolecule(mol)
     except:
-        raise ValueError("Molecular optimization failed.")
+        return False
 
     # Extract atomic coordinates
     conformer = mol.GetConformer()
@@ -144,14 +145,18 @@ def plot_3d(smiles):
     atom_positions = np.array([conformer.GetAtomPosition(i) for i in range(mol.GetNumAtoms())])
     atom_symbols = [mol.GetAtomWithIdx(i).GetSymbol() for i in range(mol.GetNumAtoms())]
 
+    # Define colors: Green for O, Red for H, Blue for others
+    atom_colors = ['green' if atom == 'O' else 'red' if atom == 'H' else 'blue' for atom in atom_symbols]
+
     # Create 3D scatter plot for atoms
     fig = go.Figure()
     fig.add_trace(go.Scatter3d(
         x=atom_positions[:, 0], y=atom_positions[:, 1], z=atom_positions[:, 2],
         mode='markers+text',
-        marker=dict(size=6, color='blue', opacity=0.8),
+        marker=dict(size=3, color=atom_colors, opacity=0.8),
         text=atom_symbols,
-        textposition="top center"
+        textposition="top center",
+        showlegend=False  # Hide the legend
     ))
 
     # Add bonds as lines
@@ -162,22 +167,36 @@ def plot_3d(smiles):
             y=[atom_positions[start][1], atom_positions[end][1]],
             z=[atom_positions[start][2], atom_positions[end][2]],
             mode='lines',
-            line=dict(color='gray', width=3)
+            line=dict(color='gray', width=3),
+            showlegend=False  # Hide legend for bonds
         ))
 
     # Format layout
     fig.update_layout(
         title="3D Molecular Structure",
-        scene=dict(xaxis_title='X', yaxis_title='Y', zaxis_title='Z'),
+        scene=dict(
+            xaxis_title='X', yaxis_title='Y', zaxis_title='Z',
+            xaxis=dict(showticklabels=False),
+            yaxis=dict(showticklabels=False),
+            zaxis=dict(showticklabels=False)
+        ),
         width=600, height=600,
-        margin=dict(l=0, r=0, b=0, t=40)
+        margin=dict(l=0, r=0, b=0, t=40),
+        showlegend=False  # Hide legend globally
     )
+    if fig:
+        st.write(fig)
+        return True
+    else:
+        return False    
+    
     
 
-    return st.write(fig)
-
-
-
+find_smilar_drug=Tool(
+    name="SimilarityDrugs",
+    func=FindSimilarDrugs,
+    description="Find the top 5 similar drugs similar to inputs"
+)
 find_drug_tool=Tool(
         name="FindDrug",
         func=FindDrug ,
@@ -185,16 +204,16 @@ find_drug_tool=Tool(
     )
 plot_smiles=Tool(
     name="Plot2dSmiles",
-    func=plot_2d_smiles,
+    func=PlotSmiles,
     description="PLot the smiles from the given drug related smiles "
 )
-plot_3d=Tool(
+plot_3d_smile=Tool(
     name="Plot3dSmiles",
     func=plot_3d,
     description="Plot the 3d smiles from the given drug related smiles"
 )   
 agent=initialize_agent(
-        tools=[find_drug_tool,plot_smiles,plot_3d],
+        tools=[find_drug_tool,plot_smiles,plot_3d_smile,find_smilar_drug],
         llm=llm,
         agent="zero-shot-react-description",
         verbose=True
