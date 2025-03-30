@@ -4,6 +4,8 @@ import requests
 import ast
 import json
 import hashlib
+import tempfile
+
 from datetime import datetime
 from glob import glob
 from io import StringIO
@@ -32,6 +34,9 @@ from rdkit import Chem
 from rdkit.Chem import AllChem
 
 import streamlit as st
+import networkx as nx
+import nx_arangodb as nxadb
+from pyvis.network import Network
 
 import boto3
 
@@ -151,6 +156,29 @@ def FindProteinsFromDrug(drug_name):
     """
 
     cursor = db.aql.execute(query, bind_vars={"drug_name": drug_name})
+
+    G = nxadb.Graph(name="NeuThera")
+
+    if G.has_node(drug_name):
+        neighbors = list(G.neighbors(drug_name))
+
+        subgraph_nodes = [drug_name] + neighbors
+        subgraph = G.subgraph(subgraph_nodes)
+
+        net = Network(height="600px", width="100%", directed=True, notebook=False)
+        
+        for node in subgraph.nodes():
+            node_color = "lightblue" if node == drug_name else "lightgreen"
+            net.add_node(node, label=node, color=node_color)
+
+        for source, target in subgraph.edges():
+            net.add_edge(source, target, color="gray")
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".html") as tmpfile:
+            net.save_graph(tmpfile.name)
+            st.components.v1.html(open(tmpfile.name, "r").read(), height=700)
+            os.unlink(tmpfile.name)
+
     return [doc["_key"] for doc in cursor]
 
 def PlotSmiles2D(smiles):
@@ -178,26 +206,23 @@ def PlotSmiles3D(smiles):
     Returns:
         boolean for if plotted or not 
     """
-    # Convert SMILES to molecule
+
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         return False
 
     mol = Chem.AddHs(mol)
-    Chem.SanitizeMol(mol)  # Add hydrogen atoms
+    Chem.SanitizeMol(mol) 
 
-    # Try to generate 3D coordinates
     status = AllChem.EmbedMolecule(mol, AllChem.ETKDG())
-    if status == -1:  # If embedding fails
+    if status == -1: 
         return False
 
-    # Optimize the molecule
     try:
         AllChem.UFFOptimizeMolecule(mol)
     except:
         return False
 
-    # Extract atomic coordinates
     conformer = mol.GetConformer()
     if not conformer.Is3D():
         return False
@@ -205,10 +230,8 @@ def PlotSmiles3D(smiles):
     atom_positions = np.array([conformer.GetAtomPosition(i) for i in range(mol.GetNumAtoms())])
     atom_symbols = [mol.GetAtomWithIdx(i).GetSymbol() for i in range(mol.GetNumAtoms())]
 
-    # Define colors: Green for O, Red for H, Blue for others
     atom_colors = ['green' if atom == 'O' else 'red' if atom == 'H' else 'blue' for atom in atom_symbols]
 
-    # Create 3D scatter plot for atoms
     fig = go.Figure()
     fig.add_trace(go.Scatter3d(
         x=atom_positions[:, 0], y=atom_positions[:, 1], z=atom_positions[:, 2],
@@ -216,10 +239,9 @@ def PlotSmiles3D(smiles):
         marker=dict(size=3, color=atom_colors, opacity=0.8),
         text=atom_symbols,
         textposition="top center",
-        showlegend=False  # Hide the legend
+        showlegend=False 
     ))
 
-    # Add bonds as lines
     for bond in mol.GetBonds():
         start, end = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
         fig.add_trace(go.Scatter3d(
@@ -228,10 +250,9 @@ def PlotSmiles3D(smiles):
             z=[atom_positions[start][2], atom_positions[end][2]],
             mode='lines',
             line=dict(color='gray', width=3),
-            showlegend=False  # Hide legend for bonds
+            showlegend=False 
         ))
 
-    # Format layout
     fig.update_layout(
         title="3D Molecular Structure",
         scene=dict(
@@ -242,7 +263,7 @@ def PlotSmiles3D(smiles):
         ),
         width=600, height=600,
         margin=dict(l=0, r=0, b=0, t=40),
-        showlegend=False  # Hide legend globally
+        showlegend=False
     )
     if fig:
         st.write(fig)
