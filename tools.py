@@ -200,7 +200,7 @@ def PlotSmiles3D(smiles):
     # Extract atomic coordinates
     conformer = mol.GetConformer()
     if not conformer.Is3D():
-        raise ValueError("Conformer is not in 3D.")
+        return False
 
     atom_positions = np.array([conformer.GetAtomPosition(i) for i in range(mol.GetNumAtoms())])
     atom_symbols = [mol.GetAtomWithIdx(i).GetSymbol() for i in range(mol.GetNumAtoms())]
