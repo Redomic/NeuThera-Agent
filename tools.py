@@ -120,11 +120,11 @@ def FindSimilarDrugs(drug_name, top_k=5):
     results = list(cursor)
 
     if results:
-        df = pd.DataFrame(results)
+        df = pd.DataFrame(results, index=False)
         st.table(df)
         return list(cursor)
     
-    return []
+    return results
 
 def FindProteinsFromDrug(drug_name):
     """
