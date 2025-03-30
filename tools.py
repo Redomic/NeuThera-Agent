@@ -35,7 +35,6 @@ from rdkit.Chem import AllChem
 
 import streamlit as st
 import networkx as nx
-import nx_arangodb as nxadb
 from pyvis.network import Network
 
 import boto3
@@ -157,29 +156,38 @@ def FindProteinsFromDrug(drug_name):
 
     cursor = db.aql.execute(query, bind_vars={"drug_name": drug_name})
 
-    G = nxadb.Graph(name="NeuThera", db=db)
+    proteins = [doc["_key"] for doc in cursor]
 
-    if G.has_node(drug_name):
-        neighbors = list(G.neighbors(drug_name))
+    graph_query = """
+    FOR d IN drug 
+        FILTER LOWER(d.drug_name) == LOWER(@drug_name)
+        LIMIT 1  
+        FOR v, e, p IN 1..2 OUTBOUND d._id
+            GRAPH "NeuThera"
+            RETURN { from: p.vertices[0]._key, to: v._key, type: e._id }
+    """
+    graph_cursor = db.aql.execute(graph_query, bind_vars={"drug_name": drug_name})
+    edges = list(graph_cursor)
 
-        subgraph_nodes = [drug_name] + neighbors
-        subgraph = G.subgraph(subgraph_nodes)
+    G = nx.DiGraph()
+    
+    for edge in edges:
+        G.add_edge(edge["from"], edge["to"], label=edge["type"])
+    
+    net = Network(height="600px", width="100%", directed=True, notebook=False)
 
-        net = Network(height="600px", width="100%", directed=True, notebook=False)
-        
-        for node in subgraph.nodes():
-            node_color = "lightblue" if node == drug_name else "lightgreen"
-            net.add_node(node, label=node, color=node_color)
+    for node in G.nodes():
+        net.add_node(node, label=node, color="lightblue")
+    
+    for edge in G.edges():
+        net.add_edge(edge[0], edge[1], title=G.edges[edge]["label"], color="gray")
 
-        for source, target in subgraph.edges():
-            net.add_edge(source, target, color="gray")
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".html") as tmpfile:
+        net.save_graph(tmpfile.name)
+        st.components.v1.html(open(tmpfile.name, "r").read(), height=700)
+        os.unlink(tmpfile.name)
 
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".html") as tmpfile:
-            net.save_graph(tmpfile.name)
-            st.components.v1.html(open(tmpfile.name, "r").read(), height=700)
-            os.unlink(tmpfile.name)
-
-    return [doc["_key"] for doc in cursor]
+    return proteins
 
 def PlotSmiles2D(smiles):
     """Generates and displays a 2D molecular structure from a SMILES string.
