@@ -27,6 +27,8 @@ from rdkit import Chem, DataStructs
 from rdkit.Chem import MACCSkeys
 from rdkit.Chem import Draw, AllChem
 
+import streamlit as st
+
 import boto3
 
 # load_dotenv()
@@ -106,3 +108,19 @@ def FindSimilarDrugs(drug_name, top_k=5):
     cursor = db.aql.execute(aql_query, bind_vars={"drug_name": drug_name, "query_vector": embedding, "top_k": top_k})
     
     return list(cursor)
+
+def PlotSmiles(smiles):
+    """Generates and displays a 2D molecular structure from a SMILES string.
+    
+    Args:
+        smiles (str): SMILES representation of the molecule.
+    
+    Returns:
+        Boolean for if plotted or not
+    """
+    mol = Chem.MolFromSmiles(smiles)
+    if mol:
+        st.write(Draw.MolToImage(mol, size=(300, 300))) 
+        return True # Generate 2D image
+    else:
+        raise False
