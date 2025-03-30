@@ -82,9 +82,9 @@ def FindSimilarDrugs(drug_name, top_k=5):
     """
     # Fetch the target drug's embedding
     query = f"""
-        FOR doc IN drug
-            FILTER doc.name == @drug_name
-            RETURN doc.embedding
+        FOR d IN drug
+            FILTER LOWER(d.drug_name) == LOWER(@drug_name) OR LOWER(@drug_name) IN TOKENS(d.synonym, "text_en")
+            RETURN d.embedding
     """
     result = list(db.aql.execute(query, bind_vars={"drug_name": drug_name}))
     
@@ -95,13 +95,14 @@ def FindSimilarDrugs(drug_name, top_k=5):
 
     aql_query = f"""
         LET query_vector = @query_vector
-        FOR doc IN drug
-            LET score = COSINE_SIMILARITY(doc.embedding, query_vector)
+        FOR d IN drug
+            FILTER LOWER(d.drug_name) != LOWER(@drug_name)
+            LET score = COSINE_SIMILARITY(d.embedding, query_vector)
             SORT score DESC
             LIMIT @top_k
-            RETURN {{ drug: doc.name, similarity_score: score }}
+            RETURN {{ drug: d.drug_name, similarity_score: score }}
     """
 
-    cursor = db.aql.execute(aql_query, bind_vars={"query_vector": embedding, "top_k": top_k})
+    cursor = db.aql.execute(aql_query, bind_vars={"drug_name": drug_name, "query_vector": embedding, "top_k": top_k})
     
     return list(cursor)
