@@ -64,7 +64,7 @@ def FindDrug(drug_name: str):
         }
     """
     
-    cursor = db.aql.execute(query, bind_vars={"name": name})
+    cursor = db.aql.execute(query, bind_vars={"name": drug_name})
     results = list(cursor)
     
     return results[0] if results else None
@@ -104,3 +104,5 @@ def FindSimilarDrugs(drug_name, top_k=5):
     cursor = db.aql.execute(aql_query, bind_vars={"query_vector": embedding, "top_k": top_k})
     
     return list(cursor)
+def FindProteinsFromDrug(drug_name: str):
+
