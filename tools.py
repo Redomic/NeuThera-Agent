@@ -172,7 +172,8 @@ def FindProteinsFromDrug(drug_name):
     G = nx.DiGraph()
     
     for edge in edges:
-        G.add_edge(edge["from"], edge["to"], label=edge["type"])
+        if (edge["from"] != None) and (edge["to"] != None) and (edge["type"] != None):
+            G.add_edge(edge["from"], edge["to"], label=edge["type"])
     
     net = Network(height="600px", width="100%", directed=True, notebook=False)
 
