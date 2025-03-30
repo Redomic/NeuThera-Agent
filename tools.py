@@ -123,8 +123,8 @@ def FindSimilarDrugs(drug_name):
 
     if results:
         df = pd.DataFrame(results)
-        st.table(df)
-        return list(cursor)
+        # st.table(df)
+        return results
     
     return results
 
