@@ -34,13 +34,10 @@ agent=initialize_agent(
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Display previous messages (text & images)
+# Display previous messages
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
-        if message.get("type", "text") == "text":  # Default to text if "type" key is missing
-            st.markdown(message["content"])
-        elif message["type"] == "image":
-            st.image(message["content"])
+        st.markdown(message["content"])
 
 # User Input
 user_input = st.chat_input("Type your drug-related query...")
