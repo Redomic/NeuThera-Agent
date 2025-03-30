@@ -27,6 +27,10 @@ from rdkit import Chem, DataStructs
 from rdkit.Chem import MACCSkeys
 from rdkit.Chem import Draw, AllChem
 
+import plotly.graph_objects as go
+from rdkit import Chem
+from rdkit.Chem import AllChem
+
 import streamlit as st
 
 import boto3
@@ -42,7 +46,7 @@ import boto3
 
 # llm = Bedrock(client=bedrock_client, model_id="mistral.mistral-large-2402-v1:0")
 
-# ================= Function =================
+# ================= Functions =================
 
 def FindDrug(drug_name: str):
     """
@@ -164,6 +168,87 @@ def PlotSmiles2D(smiles):
     else:
         raise False
 
+def PlotSmiles3D(smiles):
+    """Generates an interactive 3D molecular structure from a SMILES string.
+    
+    Args:
+        smiles (str): SMILES representation of the molecule.
+    
+    Returns:
+        boolean for if plotted or not 
+    """
+    # Convert SMILES to molecule
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return False
+
+    mol = Chem.AddHs(mol)
+    Chem.SanitizeMol(mol)  # Add hydrogen atoms
+
+    # Try to generate 3D coordinates
+    status = AllChem.EmbedMolecule(mol, AllChem.ETKDG())
+    if status == -1:  # If embedding fails
+        return False
+
+    # Optimize the molecule
+    try:
+        AllChem.UFFOptimizeMolecule(mol)
+    except:
+        return False
+
+    # Extract atomic coordinates
+    conformer = mol.GetConformer()
+    if not conformer.Is3D():
+        raise ValueError("Conformer is not in 3D.")
+
+    atom_positions = np.array([conformer.GetAtomPosition(i) for i in range(mol.GetNumAtoms())])
+    atom_symbols = [mol.GetAtomWithIdx(i).GetSymbol() for i in range(mol.GetNumAtoms())]
+
+    # Define colors: Green for O, Red for H, Blue for others
+    atom_colors = ['green' if atom == 'O' else 'red' if atom == 'H' else 'blue' for atom in atom_symbols]
+
+    # Create 3D scatter plot for atoms
+    fig = go.Figure()
+    fig.add_trace(go.Scatter3d(
+        x=atom_positions[:, 0], y=atom_positions[:, 1], z=atom_positions[:, 2],
+        mode='markers+text',
+        marker=dict(size=3, color=atom_colors, opacity=0.8),
+        text=atom_symbols,
+        textposition="top center",
+        showlegend=False  # Hide the legend
+    ))
+
+    # Add bonds as lines
+    for bond in mol.GetBonds():
+        start, end = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        fig.add_trace(go.Scatter3d(
+            x=[atom_positions[start][0], atom_positions[end][0]],
+            y=[atom_positions[start][1], atom_positions[end][1]],
+            z=[atom_positions[start][2], atom_positions[end][2]],
+            mode='lines',
+            line=dict(color='gray', width=3),
+            showlegend=False  # Hide legend for bonds
+        ))
+
+    # Format layout
+    fig.update_layout(
+        title="3D Molecular Structure",
+        scene=dict(
+            xaxis_title='X', yaxis_title='Y', zaxis_title='Z',
+            xaxis=dict(showticklabels=False),
+            yaxis=dict(showticklabels=False),
+            zaxis=dict(showticklabels=False)
+        ),
+        width=600, height=600,
+        margin=dict(l=0, r=0, b=0, t=40),
+        showlegend=False  # Hide legend globally
+    )
+    if fig:
+        st.write(fig)
+        return True
+    else:
+        return False    
+
 # ================= Tooling =================
 
 find_drug_tool = Tool(
@@ -178,7 +263,7 @@ find_similar_drugs_tool = Tool(
     description=FindSimilarDrugs.__doc__
 )
 
-find_proteins_from_drug = Tool(
+find_proteins_from_drug_tool = Tool(
     name="FindProteinsFromDrug",
     func=FindProteinsFromDrug,
     description=FindProteinsFromDrug.__doc__
@@ -190,4 +275,10 @@ plot_smiles_2d_tool = Tool(
     description=PlotSmiles2D.__doc__
 )
 
-tools = [find_drug_tool, find_similar_drugs_tool, find_proteins_from_drug, plot_smiles_2d_tool]
+plot_smiles_3d_tool = Tool(
+    name="PlotSmiles3D",
+    func=PlotSmiles3D,
+    description=PlotSmiles3D.__doc__
+)
+
+tools = [find_drug_tool, find_similar_drugs_tool, find_proteins_from_drug_tool, plot_smiles_2d_tool, plot_smiles_3d_tool]
