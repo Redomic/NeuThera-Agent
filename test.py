@@ -1,3 +1,3 @@
 from tools import FindDrug
 
-print(FindDrug('random'))
+print(FindDrug('Goserelin'))
