@@ -89,7 +89,6 @@ def FindSimilarDrugs(drug_name, top_k=5):
     
     Args:
         drug_name (str): The name of the drug to compare.
-        top_k (int): Number of similar drugs to return.
 
     Returns:
         List of tuples [(drug_name, similarity_score), ...]
