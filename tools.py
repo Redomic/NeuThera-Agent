@@ -68,6 +68,7 @@ def FindDrug(drug_name: str):
     results = list(cursor)
     
     return results[0] if results else None
+
 def FindSimilarDrugs(drug_name, top_k=5):
     """
     Finds the top k most similar drugs to the given drug_name based on cosine similarity.
@@ -104,5 +105,3 @@ def FindSimilarDrugs(drug_name, top_k=5):
     cursor = db.aql.execute(aql_query, bind_vars={"query_vector": embedding, "top_k": top_k})
     
     return list(cursor)
-def FindProteinsFromDrug(drug_name: str):
-
