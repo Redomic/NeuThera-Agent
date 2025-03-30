@@ -157,7 +157,7 @@ def FindProteinsFromDrug(drug_name):
 
     cursor = db.aql.execute(query, bind_vars={"drug_name": drug_name})
 
-    G = nxadb.Graph(name="NeuThera")
+    G = nxadb.Graph(name="NeuThera", db=db)
 
     if G.has_node(drug_name):
         neighbors = list(G.neighbors(drug_name))
