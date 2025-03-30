@@ -83,7 +83,7 @@ def FindDrug(drug_name: str):
     
     return results[0] if results else None
 
-def FindSimilarDrugs(drug_name, top_k=5):
+def FindSimilarDrugs(drug_name):
     """
     Finds the top k most similar drugs to the given drug based on cosine similarity.
     
@@ -93,6 +93,8 @@ def FindSimilarDrugs(drug_name, top_k=5):
     Returns:
         List of tuples [(drug_name, similarity_score), ...]
     """
+    
+    top_k = 5
 
     query = f"""
         FOR d IN drug
