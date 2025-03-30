@@ -1,2 +1,3 @@
-/agent
+agent
 .env
+__pycache__
