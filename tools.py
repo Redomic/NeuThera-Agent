@@ -84,8 +84,15 @@ def FindDrug(drug_name: str):
     
     cursor = db.aql.execute(query, bind_vars={"name": drug_name})
     results = list(cursor)
-    
-    return results[0] if results else None
+
+    if results:
+        with st.sidebar:
+            st.markdown(f"**Action Output**")
+            st.json(results[0])  # Use st.json for better formatting of dict output
+            st.divider()
+        return results[0]
+    else:
+        return None
 
 def FindSimilarDrugs(drug_name):
     """
@@ -128,6 +135,10 @@ def FindSimilarDrugs(drug_name):
     if results:
         df = pd.DataFrame(results)
         st.table(df)
+        with st.sidebar:
+            st.markdown(f"**Action Output**")
+            st.json(results)
+            st.divider()
         return results
     
     return results
@@ -158,35 +169,10 @@ def FindProteinsFromDrug(drug_name):
 
     proteins = [doc["_key"] for doc in cursor]
 
-    graph_query = """
-    FOR d IN drug 
-        FILTER LOWER(d.drug_name) == LOWER(@drug_name)
-        LIMIT 1  
-        FOR v, e, p IN 1..2 OUTBOUND d._id
-            GRAPH "NeuThera"
-            RETURN { from: p.vertices[0]._key, to: v._key, type: e._id }
-    """
-    graph_cursor = db.aql.execute(graph_query, bind_vars={"drug_name": drug_name})
-    edges = list(graph_cursor)
-
-    G = nx.DiGraph()
-    
-    for edge in edges:
-        if (edge["from"] != None) and (edge["to"] != None) and (edge["type"] != None):
-            G.add_edge(edge["from"], edge["to"], label=edge["type"])
-    
-    net = Network(height="600px", width="100%", directed=True, notebook=False)
-
-    for node in G.nodes():
-        net.add_node(node, label=node, color="lightblue")
-    
-    for edge in G.edges():
-        net.add_edge(edge[0], edge[1], title=G.edges[edge]["label"], color="gray")
-
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".html") as tmpfile:
-        net.save_graph(tmpfile.name)
-        st.components.v1.html(open(tmpfile.name, "r").read(), height=700)
-        os.unlink(tmpfile.name)
+    with st.sidebar:
+        st.markdown(f"**Graph Traversal**")
+        st.json(proteins)
+        st.divider()
 
     return proteins
 
@@ -275,6 +261,10 @@ def PlotSmiles3D(smiles):
         showlegend=False
     )
     if fig:
+        with st.sidebar:
+            st.markdown(f"**2D - TO - 3D**")
+            st.write(Draw.MolToImage(mol, size=(300, 300)))
+            st.divider()
         st.write(fig)
         return True
     else:
