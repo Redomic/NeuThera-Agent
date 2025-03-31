@@ -10,7 +10,7 @@ import numpy as np
 
 from dotenv import load_dotenv
 from langgraph.checkpoint.memory import MemorySaver
-from langchain.llms.bedrock import Bedrock
+from langchain_community.llms import Bedrock
 from langchain_community.graphs import ArangoGraph
 from langchain.agents import initialize_agent
 from langchain.callbacks.base import BaseCallbackHandler

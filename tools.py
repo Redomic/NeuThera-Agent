@@ -5,6 +5,7 @@ import ast
 import json
 import hashlib
 import tempfile
+import re
 
 from datetime import datetime
 from glob import glob
@@ -137,6 +138,7 @@ def FindSimilarDrugs(drug_name):
         st.table(df)
         with st.sidebar:
             st.markdown(f"**Action Output**")
+            st.code(aql_query, language="aql")
             st.json(results)
             st.divider()
         return results
@@ -161,7 +163,7 @@ def FindProteinsFromDrug(drug_name):
         FOR v, e, p IN 1..2 OUTBOUND d._id
             GRAPH "NeuThera"
             FILTER IS_SAME_COLLECTION("protein", v)
-            LIMIT 5
+            LIMIT 10
             RETURN DISTINCT { _key: v._key }
     """
 
@@ -169,10 +171,75 @@ def FindProteinsFromDrug(drug_name):
 
     proteins = [doc["_key"] for doc in cursor]
 
+    graph_query = """
+    FOR d IN drug
+        FILTER LOWER(d.drug_name) == LOWER(@drug_name)
+        LIMIT 1  
+        FOR v, e, p IN 1..3 OUTBOUND d._id GRAPH "NeuThera"
+            LIMIT 500
+            RETURN { 
+                from: p.vertices[-2]._key,
+                to: v._key,
+                type: PARSE_IDENTIFIER(v._id).collection
+            }
+    """
+
+    graph_cursor = db.aql.execute(graph_query, bind_vars={"drug_name": drug_name})
+
+    net = Network(height="500px", width="100%", directed=True, notebook=False)
+    net.force_atlas_2based()
+
+    nodes = set()
+    edges = set()
+
+    drug_pattern = re.compile(r"^DB\d+$", re.IGNORECASE)
+    gene_pattern = re.compile(r"^[A-Z0-9]+$")
+    protein_pattern = re.compile(r"^\d\w{3}$")
+
+    def classify_node(node):
+        if drug_pattern.match(node):
+            return "drug"
+        elif protein_pattern.match(node):
+            return "protein"
+        elif gene_pattern.match(node):
+            return "gene"
+        return "unknown"
+
+    color_map = {
+        "drug": "#5fa8d3",
+        "gene": "#a7c957",
+        "protein": "#bc4749",
+        "unknown": "#999999"
+    }
+
+    for doc in graph_cursor:
+        if (doc["from"] != None) and (doc["to"] != None):
+            from_node = doc["from"]
+            to_node = doc["to"]
+            edge_type = doc["type"]
+
+            nodes.add(from_node)
+            nodes.add(to_node)
+            edges.add((from_node, to_node, edge_type))
+
+    for node in nodes:
+        net.add_node(node, label=node, color=color_map[classify_node(node)])
+
+    for from_node, to_node, edge_type in edges:
+        net.add_edge(from_node, to_node, title=edge_type, color="#5c677d")
+
+    net.save_graph("graph.html")
+    with open("graph.html", "r", encoding="utf-8") as file:
+        html = file.read()
+
     with st.sidebar:
-        st.markdown(f"**Graph Traversal**")
+        st.markdown(f"**Action Output**")
+        st.code(graph_query, language="aql")
         st.json(proteins)
         st.divider()
+
+    if proteins:
+        st.components.v1.html(html, height=550, scrolling=True)
 
     return proteins
 
